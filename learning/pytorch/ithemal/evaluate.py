@@ -18,6 +18,7 @@ import warnings
 import csv
 import time
 import Queue
+import numpy as np
 
 _TOKENIZER = os.path.join(
     os.environ.get("ITHEMAL_HOME", "."), "data_collection", "build", "bin", "tokenizer"
@@ -130,10 +131,10 @@ def collect_results(output_queue, total_lines):
 def analyze_results(results):
     predictions = []
     true_values = []
-    apes = []
     valid_count = 0
     fail_count = 0
     zero_true_count = 0
+    output_data = []
     total_duration = 0.0
 
     for result_tuple in results:
@@ -151,27 +152,17 @@ def analyze_results(results):
             else:
                 predictions.append(pred)
                 true_values.append(true)
-                ape = abs((pred - true) / true) * 100.0
-                apes.append(ape)
+                output_data.append((true, pred, duration))
         else:
             fail_count += 1
 
     mape_loss = None
-    if apes:
-        predictions_tensor = torch.tensor(predictions, dtype=torch.float32)
-        true_values_tensor = torch.tensor(true_values, dtype=torch.float32)
-        absolute_percentage_error = torch.abs(
-            (predictions_tensor - true_values_tensor) / true_values_tensor
-        )
-        mape_loss = torch.mean(absolute_percentage_error).item() * 100
-    elif valid_count > 0 and zero_true_count == valid_count:
-        print(
-            "Warning: All valid predictions had true values of zero. MAPE cannot be calculated.", file=sys.stderr
-        )
+    if valid_count > 0:
+        mape_loss = np.mean(np.abs((np.array(predictions) - np.array(true_values)) / np.array(true_values))) * 100
 
     average_time = total_duration / valid_count if valid_count > 0 else 0.0
 
-    return mape_loss, average_time, valid_count, fail_count, zero_true_count, apes
+    return mape_loss, average_time, valid_count, fail_count, zero_true_count, output_data
 
 
 def main():
@@ -286,16 +277,16 @@ def main():
             p.join()
 
     print("Analyzing results...")
-    final_loss, avg_time, valid_count, fail_count, zero_true_count, apes = analyze_results(results)
+    final_loss, avg_time, valid_count, fail_count, zero_true_count, output_data = analyze_results(results)
 
-    if apes:
+    if output_data: # Check if we have data to write
         try:
             with open(args.ape_output_file, 'w') as f:
                 writer = csv.writer(f)
-                writer.writerow(['absolute_percentage_error']) # Header
-                for ape_value in apes:
-                    writer.writerow([ape_value])
-            print("Saved {} individual APEs to {}".format(len(apes), args.ape_output_file))
+                writer.writerow(['true_value', 'predicted_value', 'duration_per_hex_char']) # Updated Header
+                for true_val, pred_val, duration_val in output_data:
+                    writer.writerow([true_val, pred_val, duration_val])
+            print("Saved {} individual APEs to {}".format(len(output_data), args.ape_output_file))
         except IOError as e:
             print("Error writing APE output file: {}".format(e), file=sys.stderr)
 
