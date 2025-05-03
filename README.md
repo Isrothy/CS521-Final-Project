@@ -18,6 +18,8 @@ Once the docker environment is built, connect to it with docker/docker_connect.s
 Here is an example of how to run the benchmark using the Ithemal model for Haswell processors:
 
 ```bash
+./build.sh
+
 python learning/pytorch/ithemal/evaluate.py --model Ithemal-models/paper/haswell/predictor.dump --model-data Ithemal-models/paper/haswell/trained.mdl --input-file bhive/benchmark/throughput/hsw
 ```
 

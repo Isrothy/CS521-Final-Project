@@ -69,33 +69,37 @@ def process_line_worker(model_file, model_data_file, input_queue, output_queue):
 
             parts = line.strip().split(",")
             if len(parts) != 2:
-                output_queue.put((None, None))
+                output_queue.put((None, None, None))
                 continue
 
             block_hex, true_val_str = parts
             try:
                 true_value = float(true_val_str)
             except ValueError:
-                output_queue.put((None, None))
+                output_queue.put((None, None, None))
                 continue
 
+            start_time = time.time()
             datum = datum_of_code(data, block_hex)
 
             if datum is None:
-                output_queue.put((None, None))
+                output_queue.put((None, None, None))
                 continue
 
             try:
                 with torch.no_grad():
                     prediction_tensor = model(datum)
-
                 prediction = prediction_tensor.item()
-                output_queue.put((prediction, true_value))
+                end_time = time.time()
+                duration = end_time - start_time
+
+                output_queue.put((prediction, true_value, duration / len(block_hex)))
+
                 if hasattr(model, "remove_refs"):
                     model.remove_refs(datum)
 
             except Exception as e:
-                output_queue.put((None, None))
+                output_queue.put((None, None, None))
 
     except Exception as e:
         print("FATAL: Worker process failed: {}".format(e), file=sys.stderr)
@@ -123,42 +127,51 @@ def collect_results(output_queue, total_lines):
     return results
 
 
-def calculate_loss(results):
+def analyze_results(results):
     predictions = []
     true_values = []
+    apes = []
     valid_count = 0
     fail_count = 0
     zero_true_count = 0
+    total_duration = 0.0
 
-    for pred, true in results:
-        if pred is not None and true is not None:
+    for result_tuple in results:
+        if result_tuple is None or len(result_tuple) != 3:
+            fail_count +=1
+            continue
+
+        pred, true, duration = result_tuple
+
+        if pred is not None and true is not None and duration is not None:
+            valid_count += 1
+            total_duration += duration
             if abs(true) < 1e-9:
                 zero_true_count += 1
-                valid_count += 1
             else:
                 predictions.append(pred)
                 true_values.append(true)
-                valid_count += 1
+                ape = abs((pred - true) / true) * 100.0
+                apes.append(ape)
         else:
             fail_count += 1
 
-    if not predictions:
-        print(
-            "Error: No valid predictions with non-zero true values were made.",
-            file=sys.stderr,
+    mape_loss = None
+    if apes:
+        predictions_tensor = torch.tensor(predictions, dtype=torch.float32)
+        true_values_tensor = torch.tensor(true_values, dtype=torch.float32)
+        absolute_percentage_error = torch.abs(
+            (predictions_tensor - true_values_tensor) / true_values_tensor
         )
-        return None, valid_count, fail_count, zero_true_count
+        mape_loss = torch.mean(absolute_percentage_error).item() * 100
+    elif valid_count > 0 and zero_true_count == valid_count:
+        print(
+            "Warning: All valid predictions had true values of zero. MAPE cannot be calculated.", file=sys.stderr
+        )
 
-    predictions_tensor = torch.tensor(predictions, dtype=torch.float32)
-    true_values_tensor = torch.tensor(true_values, dtype=torch.float32)
+    average_time = total_duration / valid_count if valid_count > 0 else 0.0
 
-    absolute_percentage_error = torch.abs(
-        (predictions_tensor - true_values_tensor) / true_values_tensor
-    )
-
-    mape_loss = torch.mean(absolute_percentage_error) * 100
-
-    return mape_loss.item(), valid_count, fail_count, zero_true_count
+    return mape_loss, average_time, valid_count, fail_count, zero_true_count, apes
 
 
 def main():
@@ -183,6 +196,11 @@ def main():
         help="Number of parallel worker processes",
         type=int,
         default=multiprocessing.cpu_count(),
+    )
+    parser.add_argument(
+        "--ape-output-file",
+        help="Path to save the individual Absolute Percentage Errors (one per line)",
+        default="evaluation_apes.csv"
     )
 
     args = parser.parse_args()
@@ -261,16 +279,33 @@ def main():
 
     print("Waiting for workers to terminate...")
     for p in workers:
-        p.join(timeout=60)
+        p.join(timeout=60) # Add a timeout
+        if p.is_alive():
+            print("Warning: Worker process {} did not terminate gracefully.".format(p.pid))
+            p.terminate()
+            p.join()
 
-    print("Calculating final loss...")
-    final_loss, valid_count, fail_count, zero_true_count = calculate_loss(results)
+    print("Analyzing results...")
+    final_loss, avg_time, valid_count, fail_count, zero_true_count, apes = analyze_results(results)
+
+    if apes:
+        try:
+            with open(args.ape_output_file, 'w') as f:
+                writer = csv.writer(f)
+                writer.writerow(['absolute_percentage_error']) # Header
+                for ape_value in apes:
+                    writer.writerow([ape_value])
+            print("Saved {} individual APEs to {}".format(len(apes), args.ape_output_file))
+        except IOError as e:
+            print("Error writing APE output file: {}".format(e), file=sys.stderr)
 
     print("\n--- Results ---")
     print("Total lines processed: {}".format(max(0, total_lines)))
     print("Successfully predicted (incl. zero true values): {}".format(valid_count))
     print("Failed/Skipped lines: {}".format(fail_count))
     print("Lines skipped due to zero true value: {}".format(zero_true_count))
+    if valid_count > 0:
+        print("Average evaluation time per data point: {:.6f} seconds".format(avg_time))
     if final_loss is not None:
         print("Mean Absolute Percentage Error (MAPE): %.4f%%" % final_loss)
     else:
