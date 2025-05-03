@@ -10,6 +10,6 @@ function get_sudo() {
 
 # wrapper around docker-compose to allow this to work from any directory
 function docker_compose() {
-    sudo docker-compose -f "${SCRIPT_DIR}/docker-compose.yml" "$@"
+    sudo docker compose -f "${SCRIPT_DIR}/docker-compose.yml" "$@"
     return $?
 }
