@@ -1,0 +1,9 @@
+[submodule "learning/pytorch/inputs/models"]
+	path = learning/pytorch/inputs/models
+	url = https://github.com/psg-mit/Ithemal-models.git
+[submodule "Ithemal-models"]
+	path = Ithemal-models
+	url = https://github.com/ithemal/Ithemal-models
+[submodule "bhive"]
+	path = bhive
+	url = https://github.com/ithemal/bhive

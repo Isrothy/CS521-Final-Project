@@ -1,0 +1,5 @@
+*.ipynb filter=nbstrip_full
+bhive/benchmark filter=lfs diff=lfs merge=lfs -text
+bhive/LICENSE.txt filter=lfs diff=lfs merge=lfs -text
+bhive/README.md filter=lfs diff=lfs merge=lfs -text
+bhive/timing-harness filter=lfs diff=lfs merge=lfs -text
