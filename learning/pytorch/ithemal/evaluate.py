@@ -79,9 +79,13 @@ def process_line_worker(model_file, model_data_file, input_queue, output_queue):
             except ValueError:
                 output_queue.put((None, None, None))
                 continue
-
+            
             start_time = time.time()
-            datum = datum_of_code(data, block_hex)
+            try:    
+                datum = datum_of_code(data, block_hex)
+            except ValueError:
+                output_queue.put((None, None, None))
+                continue
 
             if datum is None:
                 output_queue.put((None, None, None))
@@ -113,16 +117,10 @@ def collect_results(output_queue, total_lines):
     processed_count = 0
     while processed_count < total_lines:
         result = output_queue.get()
-        if result is None:
-            print(
-                "Warning: Received early termination signal from a worker.",
-                file=sys.stderr,
-            )
-            pass
-        else:
+        if result is not None:
             results.append(result)
         processed_count += 1
-        print("\rProcessed: {}/{}".format(processed_count, total_lines), end="")
+        print("\rProcessed: {}/{}".format(processed_count, total_lines), end="", file=sys.stderr)
         sys.stdout.flush()
     print()
     return results
@@ -189,9 +187,10 @@ def main():
         default=multiprocessing.cpu_count(),
     )
     parser.add_argument(
-        "--ape-output-file",
+        "--output-file",
         help="Path to save the individual Absolute Percentage Errors (one per line)",
-        default="evaluation_apes.csv"
+        type=str,
+        default="evaluation.csv"
     )
 
     args = parser.parse_args()
@@ -279,16 +278,16 @@ def main():
     print("Analyzing results...")
     final_loss, avg_time, valid_count, fail_count, zero_true_count, output_data = analyze_results(results)
 
-    if output_data: # Check if we have data to write
+    if output_data:
         try:
-            with open(args.ape_output_file, 'w') as f:
+            with open(args.output_file, 'w') as f:
                 writer = csv.writer(f)
                 writer.writerow(['true_value', 'predicted_value', 'duration_per_hex_char']) # Updated Header
                 for true_val, pred_val, duration_val in output_data:
                     writer.writerow([true_val, pred_val, duration_val])
-            print("Saved {} individual APEs to {}".format(len(output_data), args.ape_output_file))
+            print("Saved {} individual data to {}".format(len(output_data), args.output_file))
         except IOError as e:
-            print("Error writing APE output file: {}".format(e), file=sys.stderr)
+            print("Error writing output file: {}".format(e), file=sys.stderr)
 
     print("\n--- Results ---")
     print("Total lines processed: {}".format(max(0, total_lines)))
