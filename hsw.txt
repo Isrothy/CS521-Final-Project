@@ -1,0 +1,17 @@
+Starting 32 worker processes...
+Reading input file: bhive/benchmark/throughput/hsw.csv
+Found 321112 lines to process.
+Finished reading input. Signaling workers to stop...
+Collecting results...
+
+Waiting for workers to terminate...
+Analyzing results...
+Saved 320488 individual data to hsw.csv
+
+--- Results ---
+Total lines processed: 321112
+Successfully predicted (incl. zero true values): 320488
+Failed/Skipped lines: 624
+Lines skipped due to zero true value: 0
+Average evaluation time per data point: -0.089716 seconds
+Mean Absolute Percentage Error (MAPE): 9.5677%

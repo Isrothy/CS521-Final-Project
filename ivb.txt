@@ -1,0 +1,17 @@
+Starting 32 worker processes...
+Reading input file: bhive/benchmark/throughput/ivb.csv
+Found 317427 lines to process.
+Finished reading input. Signaling workers to stop...
+Collecting results...
+
+Waiting for workers to terminate...
+Analyzing results...
+Saved 316998 individual data to ivb.csv
+
+--- Results ---
+Total lines processed: 317427
+Successfully predicted (incl. zero true values): 316998
+Failed/Skipped lines: 429
+Lines skipped due to zero true value: 0
+Average evaluation time per data point: -0.111666 seconds
+Mean Absolute Percentage Error (MAPE): 10.2128%

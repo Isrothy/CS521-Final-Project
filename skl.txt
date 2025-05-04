@@ -1,0 +1,17 @@
+Starting 32 worker processes...
+Reading input file: bhive/benchmark/throughput/skl.csv
+Found 314877 lines to process.
+Finished reading input. Signaling workers to stop...
+Collecting results...
+
+Waiting for workers to terminate...
+Analyzing results...
+Saved 314316 individual data to skl.csv
+
+--- Results ---
+Total lines processed: 314877
+Successfully predicted (incl. zero true values): 314316
+Failed/Skipped lines: 561
+Lines skipped due to zero true value: 0
+Average evaluation time per data point: 0.083803 seconds
+Mean Absolute Percentage Error (MAPE): 10.1360%
