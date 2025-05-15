@@ -79,9 +79,9 @@ def process_line_worker(model_file, model_data_file, input_queue, output_queue):
             except ValueError:
                 output_queue.put((None, None, None))
                 continue
-            
+
             start_time = time.time()
-            try:    
+            try:
                 datum = datum_of_code(data, block_hex)
             except ValueError:
                 output_queue.put((None, None, None))
